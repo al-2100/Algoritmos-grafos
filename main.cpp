@@ -1,11 +1,13 @@
-#include <GLFW/glfw3.h>
-#include <cmath>
 #include <iostream>
-#include <random>
-#include <vector>
 #include <cstdlib>
+#include <cmath>
+#include <vector>
+#include <random>
 #include <ctime>
 #include <algorithm>
+#include <GLFW/glfw3.h>
+#include <climits>
+#include <chrono>
 
 //Variables globales
 struct Grafo {
@@ -20,6 +22,9 @@ struct Vertice {
 };
 
 struct Arista {
+    int origen;
+    int destino;
+    int peso;
     Arista(int i, int i1, int i2) {
         this->origen = i;
         this->destino = i1;
@@ -27,14 +32,11 @@ struct Arista {
     }
     Arista(){
     };
-
-    int origen;
-    int destino;
-    int peso;
 };
 enum class Algoritmo {
     KRUSKAL,
-    DIJKSTRA
+    DIJKSTRA,
+    PRIM
 };
 
 bool mostrarOriginal = false;
@@ -57,7 +59,8 @@ bool compararAristas(const Arista& arista1, const Arista& arista2) {
 
 std::vector<Arista> kruskal(Grafo& grafo) {
     std::vector<Arista> arbolMST;
-
+    // Obtener el tiempo de inicio
+    auto start = std::chrono::high_resolution_clock::now();
     // Crear una lista de aristas ordenadas por peso
     std::vector<Arista> aristas;
     for (int i = 0; i < grafo.numVertices; ++i) {
@@ -96,6 +99,13 @@ std::vector<Arista> kruskal(Grafo& grafo) {
             }
         }
     }
+    // Obtener el tiempo de fin
+    auto end = std::chrono::high_resolution_clock::now();
+    // Calcular la duración en milisegundos
+    std::chrono::duration<double, std::milli> duration = end - start;
+    double tiempoEjecucion = duration.count();
+
+    std::cout << "Tiempo: " << tiempoEjecucion << " ms" << std::endl;
 
     return arbolMST;
 }
@@ -109,6 +119,8 @@ std::vector<Arista> dijkstra(const Grafo& grafo, int origen, int destino) {
     std::vector<Arista> aristas;
 
     distancia[origen] = 0;
+    // Obtener el tiempo de inicio
+    auto start = std::chrono::high_resolution_clock::now();
 
     while (!visitado[destino]) {
         int minDistancia = INT_MAX;
@@ -153,11 +165,72 @@ std::vector<Arista> dijkstra(const Grafo& grafo, int origen, int destino) {
 
         std::reverse(aristas.begin(), aristas.end());
     }
+    // Obtener el tiempo de fin
+    auto end = std::chrono::high_resolution_clock::now();
+    // Calcular la duración en milisegundos
+    std::chrono::duration<double, std::milli> duration = end - start;
+    double tiempoEjecucion = duration.count();
+
+    std::cout << "Tiempo: " << tiempoEjecucion << " ms" << std::endl;
 
     return aristas;
 }
+//---------------------------------------------------------------//
+//Prim
+std::vector<Arista> prim(const Grafo& grafo) {
+    int numVertices = grafo.numVertices;
+    std::vector<Arista> arbolMST;
+    std::vector<bool> visitado(numVertices, false);
+    std::vector<int> distancia(numVertices, INT_MAX);
+    std::vector<int> padre(numVertices, -1);
 
+    distancia[0] = 0;
+    // Obtener el tiempo de inicio
+    auto start = std::chrono::high_resolution_clock::now();
 
+    for (int i = 0; i < numVertices; i++) {
+        int minDistancia = INT_MAX;
+        int minVertice = -1;
+
+        // Encontrar el vértice no visitado con la distancia mínima
+        for (int v = 0; v < numVertices; v++) {
+            if (!visitado[v] && distancia[v] < minDistancia) {
+                minDistancia = distancia[v];
+                minVertice = v;
+            }
+        }
+
+        if (minVertice == -1) {
+            // No hay un árbol MST válido
+            break;
+        }
+
+        visitado[minVertice] = true;
+
+        // Agregar la arista al árbol MST
+        if (padre[minVertice] != -1) {
+            arbolMST.emplace_back(padre[minVertice], minVertice, distancia[minVertice]);
+        }
+
+        // Actualizar las distancias de los vértices adyacentes no visitados
+        for (int v = 0; v < numVertices; v++) {
+            if (!visitado[v] && grafo.matrizAdyacencia[minVertice][v] != 0 &&
+                grafo.matrizAdyacencia[minVertice][v] < distancia[v]) {
+                distancia[v] = grafo.matrizAdyacencia[minVertice][v];
+                padre[v] = minVertice;
+            }
+        }
+    }
+    // Obtener el tiempo de fin
+    auto end = std::chrono::high_resolution_clock::now();
+    // Calcular la duración en milisegundos
+    std::chrono::duration<double, std::milli> duration = end - start;
+    double tiempoEjecucion = duration.count();
+
+    std::cout << "Tiempo: " << tiempoEjecucion << " ms" << std::endl;
+
+    return arbolMST;
+}
 //---------------------------------------------------------------//
 //Funciones para visualización
 void generarColoresAleatorios(int numVertices, std::vector<float>& vertexColorsR, std::vector<float>& vertexColorsG, std::vector<float>& vertexColorsB) {
@@ -328,8 +401,7 @@ void cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
 //---------------------------------------------------------------//
 Algoritmo obtenerAlgoritmo() {
     std::cout << "Seleccione el algoritmo:\n";
-    std::cout << "1. Kruskal\n";
-    std::cout << "2. Dijkstra\n";
+    std::cout << "1. Kruskal\n2. Dijkstra\n3. Prim\n";
 
     int opcion = leerEntero();
 
@@ -338,6 +410,8 @@ Algoritmo obtenerAlgoritmo() {
             return Algoritmo::KRUSKAL;
         case 2:
             return Algoritmo::DIJKSTRA;
+        case 3:
+            return Algoritmo::PRIM;
         default:
             std::cout << "Opción inválida. Seleccionando Kruskal por defecto.\n";
             return Algoritmo::KRUSKAL;
@@ -386,15 +460,20 @@ int main() {
     int origen, destino;
     if(algoritmo == Algoritmo::KRUSKAL) {
         aristas = kruskal(grafo);
-    } else {
+    }
+    else if (algoritmo == Algoritmo::PRIM) {
+        aristas = prim(grafo);
+    }
+    else {
         std::cout << "Ingrese el origen: ";
         std::cin >> origen;
         std::cout << "Ingrese el destino: ";
         std::cin >> destino;
         aristas = dijkstra(grafo, origen - 1, destino - 1);
     }
+    std::cout << "Aristas:\n";
     for (const Arista& arista : aristas) {
-        std::cout << "Aristas:\nOrigen: " << arista.origen + 1 << ", Destino: " << arista.destino + 1 << ", Peso: " << arista.peso << std::endl;
+        std::cout << "Origen: " << arista.origen + 1 << ", Destino: " << arista.destino + 1 << ", Peso: " << arista.peso << std::endl;
     }
     // Inicializar las coordenadas iniciales de los vértices
     int width, height;
@@ -452,12 +531,15 @@ int main() {
             // Detectar transición de "no presionado" a "presionado"
             pasoActual = 0;
             aristas.clear();
-            std::shuffle(vertices.begin(), vertices.end(), std::mt19937(std::random_device()()));
 
             if(algoritmo == Algoritmo::KRUSKAL) {
                 aristas = kruskal(grafo);
-            } else {
-                aristas = dijkstra(grafo, origen, destino);
+            }
+            else if (algoritmo == Algoritmo::DIJKSTRA){
+                aristas = dijkstra(grafo, origen - 1 , destino - 1);
+            }
+            else {
+                aristas = prim(grafo);
             }
         }
         rPresionadoAnteriormente = rPresionado;
