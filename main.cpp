@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdlib>
+#include <iomanip>
 #include <cmath>
 #include <vector>
 #include <random>
@@ -8,6 +9,8 @@
 #include <GLFW/glfw3.h>
 #include <climits>
 #include <chrono>
+#include <queue>
+#include <functional>
 
 //Variables globales
 struct Grafo {
@@ -38,8 +41,12 @@ enum class Algoritmo {
     DIJKSTRA,
     PRIM
 };
-
-bool mostrarOriginal = false;
+enum class Modo {
+    Muestreo,
+    Visual
+};
+std::vector<double> tiemposKruskal, tiemposPrim;
+bool mostrarOriginal = false, visual = true;
 //---------------------------------------------------------------//
 //Utilitarios
 int leerEntero() {
@@ -59,8 +66,6 @@ bool compararAristas(const Arista& arista1, const Arista& arista2) {
 
 std::vector<Arista> kruskal(Grafo& grafo) {
     std::vector<Arista> arbolMST;
-    // Obtener el tiempo de inicio
-    auto start = std::chrono::high_resolution_clock::now();
     // Crear una lista de aristas ordenadas por peso
     std::vector<Arista> aristas;
     for (int i = 0; i < grafo.numVertices; ++i) {
@@ -74,6 +79,9 @@ std::vector<Arista> kruskal(Grafo& grafo) {
             }
         }
     }
+    // Obtener el tiempo de inicio
+    auto start = std::chrono::high_resolution_clock::now();
+
     std::sort(aristas.begin(), aristas.end(), compararAristas);
 
     // Crear una lista para almacenar los conjuntos disjuntos
@@ -105,7 +113,10 @@ std::vector<Arista> kruskal(Grafo& grafo) {
     std::chrono::duration<double, std::milli> duration = end - start;
     double tiempoEjecucion = duration.count();
 
-    std::cout << "Tiempo: " << tiempoEjecucion << " ms" << std::endl;
+    if (visual) {
+        std::cout << "Tiempo: " << tiempoEjecucion << " ms" << std::endl;
+    } else
+        tiemposKruskal.push_back(tiempoEjecucion);
 
     return arbolMST;
 }
@@ -188,22 +199,15 @@ std::vector<Arista> prim(const Grafo& grafo) {
     // Obtener el tiempo de inicio
     auto start = std::chrono::high_resolution_clock::now();
 
-    for (int i = 0; i < numVertices; i++) {
-        int minDistancia = INT_MAX;
-        int minVertice = -1;
+    std::priority_queue<std::pair<int, int>, std::vector<std::pair<int, int>>, std::greater<>> pq;
+    pq.emplace(0, 0); // (distancia, vértice)
 
-        // Encontrar el vértice no visitado con la distancia mínima
-        for (int v = 0; v < numVertices; v++) {
-            if (!visitado[v] && distancia[v] < minDistancia) {
-                minDistancia = distancia[v];
-                minVertice = v;
-            }
-        }
+    while (!pq.empty()) {
+        int minVertice = pq.top().second;
+        pq.pop();
 
-        if (minVertice == -1) {
-            // No hay un árbol MST válido
-            break;
-        }
+        if (visitado[minVertice])
+            continue;
 
         visitado[minVertice] = true;
 
@@ -218,16 +222,21 @@ std::vector<Arista> prim(const Grafo& grafo) {
                 grafo.matrizAdyacencia[minVertice][v] < distancia[v]) {
                 distancia[v] = grafo.matrizAdyacencia[minVertice][v];
                 padre[v] = minVertice;
+                pq.push(std::make_pair(distancia[v], v));
             }
         }
     }
+
     // Obtener el tiempo de fin
     auto end = std::chrono::high_resolution_clock::now();
     // Calcular la duración en milisegundos
     std::chrono::duration<double, std::milli> duration = end - start;
     double tiempoEjecucion = duration.count();
-
-    std::cout << "Tiempo: " << tiempoEjecucion << " ms" << std::endl;
+    if (visual) {
+        std::cout << "Tiempo: " << tiempoEjecucion << " ms" << std::endl;
+    } else {
+        tiemposPrim.push_back(tiempoEjecucion);
+    }
 
     return arbolMST;
 }
@@ -418,6 +427,41 @@ Algoritmo obtenerAlgoritmo() {
     }
 }
 
+Modo obtenerModo() {
+    std::cout << "Seleccione el modo de ejecucion del programa:\n";
+    std::cout << "1. Prueba de tiempos\n2. Visualizacion\n";
+
+    int opcion = leerEntero();
+
+    switch (opcion) {
+        case 1:
+            return Modo::Muestreo;
+        case 2:
+            return Modo::Visual;
+        default:
+            std::cout << "Opción inválida. Seleccionando visualización por defecto.\n";
+            return Modo::Visual;
+    }
+}
+
+// Genera una matriz de adyacencia aleatoria de tamaño N x N con pesos aleatorios en el rango [minWeight, maxWeight]
+std::vector<std::vector<int>> generarMatrizAdyacenciaAleatoria(int N, int minWeight, int maxWeight) {
+    std::vector<std::vector<int>> matriz(N, std::vector<int>(N, 0));
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dist(minWeight, maxWeight);
+
+    for (int i = 0; i < N; ++i) {
+        for (int j = i + 1; j < N; ++j) {
+            int peso = dist(gen);
+            matriz[i][j] = peso;
+            matriz[j][i] = peso;
+        }
+    }
+
+    return matriz;
+}
+
 std::vector<std::vector<int>> leerMatrizAdyacencia(int numVertices) {
     std::vector<std::vector<int>> matriz(numVertices, std::vector<int>(numVertices));
 
@@ -433,6 +477,106 @@ std::vector<std::vector<int>> leerMatrizAdyacencia(int numVertices) {
 //---------------------------------------------------------------//
 int main() {
     srand(static_cast<unsigned int>(time(nullptr)));
+    Grafo grafo;
+
+    //Obtener el modo de ejecución del programa
+    Modo modo = obtenerModo();
+    if (modo == Modo::Muestreo){
+        int iteraciones, N, totalAristas, numAristasActual = 0;
+        std::vector<Arista> aristasAlgoritmo, aristasTotales;
+        std::vector<int> aristasIteracion;
+        visual = !visual;
+
+        std::cout << "Ingrese N (Matrices NxN): ";
+        std::cin >> N;
+        std::cout << "Iteraciones: ";
+        std::cin >> iteraciones;
+        grafo.numVertices = N;
+        for (int i = 0; i < iteraciones; i++){
+            totalAristas = 0;
+            std::vector<std::vector<int>> matrizAdyacencia = generarMatrizAdyacenciaAleatoria(N, 0, 10);
+            grafo.matrizAdyacencia = matrizAdyacencia;
+            //Se hallan la cantidad de aristas del grafo generado
+            for (int j = 0; j < grafo.numVertices; ++j) {
+                for (int z = j + 1; z < grafo.numVertices; ++z) {
+                    if (grafo.matrizAdyacencia[j][z] != 0) {
+                        Arista arista;
+                        arista.origen = j;
+                        arista.destino = z;
+                        arista.peso = grafo.matrizAdyacencia[j][z];
+                        aristasTotales.push_back(arista);
+                        totalAristas++;
+                    }
+                }
+            }
+            aristasIteracion.push_back(totalAristas);
+            //Algoritmos
+            aristasAlgoritmo = kruskal(grafo);
+            aristasAlgoritmo.clear();
+            aristasAlgoritmo = prim(grafo);
+        }
+        std::cout << "Tiempos de ejecucion de Kruskal\nTiempo\t\t#Aristas\n";
+        double promedioKruskal = 0, promedioPrim = 0;
+        for (int i = 0; i < iteraciones; i++) {
+            std::cout << std::fixed << std::setprecision(5) << tiemposKruskal[i] << "ms\t"<< aristasIteracion[i]<< "\n";
+            promedioKruskal += tiemposKruskal[i];
+        }
+        std::cout << "Tiempos de ejecucion de Prim\n# Tiempo\t#Aristas\n";
+        for (int i = 0; i < iteraciones; i++) {
+            std::cout << tiemposPrim[i] << "ms\t"<< aristasIteracion[i]<< "\n";
+            promedioPrim += tiemposPrim[i];
+        }
+        std::cout << "Promedio Kruskal: "<< promedioKruskal/iteraciones << "ms\n";
+        std::cout << "Promedio Prim: "<< promedioPrim/iteraciones << "ms\n";
+
+        std::vector<int> numAristasUsadasK;
+        std::vector<int> numAristasUsadasP;
+
+        std::cout << "\nPromedio por aristas en Kruskal\nAristas\tTiempo\n";
+        for (int i = 0; i < iteraciones; ++i) {
+            numAristasActual = aristasIteracion[i];
+
+            if (std::find(numAristasUsadasK.begin(), numAristasUsadasK.end(), numAristasActual) == numAristasUsadasK.end()) {
+                int veces = 0;
+                double sumaTiempos = 0.0;
+
+                for (int j = 0; j < iteraciones; ++j){
+                    if (numAristasActual == aristasIteracion[j]){
+                        sumaTiempos += tiemposKruskal[j];
+                        veces++;
+                    }
+                }
+
+                double promedio = sumaTiempos / veces;
+                std::cout << numAristasActual << "\t" << promedio << " ms\n";
+                numAristasUsadasK.push_back(numAristasActual);
+            }
+        }
+        numAristasActual = 0;
+        std::cout << "\nPromedio por aristas en Prim\nAristas\tTiempo\n";
+        for (int i = 0; i < iteraciones; ++i) {
+            numAristasActual = aristasIteracion[i];
+
+            if (std::find(numAristasUsadasP.begin(), numAristasUsadasP.end(), numAristasActual) == numAristasUsadasP.end()) {
+                int veces = 0;
+                double sumaTiempos = 0.0;
+
+                for (int j = 0; j < iteraciones; ++j){
+                    if (numAristasActual == aristasIteracion[j]){
+                        sumaTiempos += tiemposPrim[j];
+                        veces++;
+                    }
+                }
+
+                double promedio = sumaTiempos / veces;
+                std::cout << numAristasActual << "\t" << promedio << " ms\n";
+                numAristasUsadasP.push_back(numAristasActual);
+            }
+        }
+
+        return 0;
+    }
+
     //Inicia glfw
     if (!glfwInit()) {
         return -1;
@@ -448,8 +592,6 @@ int main() {
     std::cout << "Ingrese el numero de vertices del grafo: ";
     int numVertices = leerEntero();
     std::vector<std::vector<int>> matrizAdyacencia = leerMatrizAdyacencia(numVertices);
-
-    Grafo grafo;
     grafo.numVertices = numVertices;
     grafo.matrizAdyacencia = matrizAdyacencia;
 
