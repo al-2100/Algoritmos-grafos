@@ -6,6 +6,7 @@
 #include <random>
 #include <ctime>
 #include <algorithm>
+#include <fstream>
 #include <GLFW/glfw3.h>
 #include <climits>
 #include <chrono>
@@ -44,6 +45,10 @@ enum class Algoritmo {
 enum class Modo {
     Muestreo,
     Visual
+};
+enum class Config {
+    Automatico,
+    Manual
 };
 std::vector<double> tiemposKruskal, tiemposPrim;
 bool mostrarOriginal = false, visual = true;
@@ -444,6 +449,22 @@ Modo obtenerModo() {
     }
 }
 
+Config obtenerConfig() {
+    std::cout << "1. Manual (seleccionar #vertices)\n2. Automatico (#vertices del 2 al 30)\n";
+    int opcion = leerEntero();
+
+    switch (opcion) {
+        case 1:
+            return Config::Manual;
+        case 2:
+            return Config::Automatico;
+        default:
+            std::cout << "Opción inválida. Seleccionando automatico por defecto.\n";
+            return Config::Automatico;
+    }
+}
+
+
 // Genera una matriz de adyacencia aleatoria de tamaño N x N con pesos aleatorios en el rango [minWeight, maxWeight]
 std::vector<std::vector<int>> generarMatrizAdyacenciaAleatoria(int N, int minWeight, int maxWeight) {
     std::vector<std::vector<int>> matriz(N, std::vector<int>(N, 0));
@@ -482,98 +503,183 @@ int main() {
     //Obtener el modo de ejecución del programa
     Modo modo = obtenerModo();
     if (modo == Modo::Muestreo){
-        int iteraciones, N, totalAristas, numAristasActual = 0;
-        std::vector<Arista> aristasAlgoritmo, aristasTotales;
-        std::vector<int> aristasIteracion;
-        visual = !visual;
+        Config config = obtenerConfig();
+        if(config == Config::Manual) {
+            int iteraciones, N, totalAristas, numAristasActual = 0;
+            std::vector<Arista> aristasAlgoritmo, aristasTotales;
+            std::vector<int> aristasIteracion;
+            visual = !visual;
 
-        std::cout << "Ingrese N (Matrices NxN): ";
-        std::cin >> N;
-        std::cout << "Iteraciones: ";
-        std::cin >> iteraciones;
-        grafo.numVertices = N;
-        for (int i = 0; i < iteraciones; i++){
-            totalAristas = 0;
-            std::vector<std::vector<int>> matrizAdyacencia = generarMatrizAdyacenciaAleatoria(N, 0, 10);
-            grafo.matrizAdyacencia = matrizAdyacencia;
-            //Se hallan la cantidad de aristas del grafo generado
-            for (int j = 0; j < grafo.numVertices; ++j) {
-                for (int z = j + 1; z < grafo.numVertices; ++z) {
-                    if (grafo.matrizAdyacencia[j][z] != 0) {
-                        Arista arista;
-                        arista.origen = j;
-                        arista.destino = z;
-                        arista.peso = grafo.matrizAdyacencia[j][z];
-                        aristasTotales.push_back(arista);
-                        totalAristas++;
+            std::cout << "Ingrese N (Matrices NxN): ";
+            std::cin >> N;
+            std::cout << "Iteraciones: ";
+            std::cin >> iteraciones;
+            grafo.numVertices = N;
+            for (int i = 0; i < iteraciones; i++){
+                totalAristas = 0;
+                std::vector<std::vector<int>> matrizAdyacencia = generarMatrizAdyacenciaAleatoria(N, 0, 10);
+                grafo.matrizAdyacencia = matrizAdyacencia;
+                //Se hallan la cantidad de aristas del grafo generado
+                for (int j = 0; j < grafo.numVertices; ++j) {
+                    for (int z = j + 1; z < grafo.numVertices; ++z) {
+                        if (grafo.matrizAdyacencia[j][z] != 0) {
+                            totalAristas++;
+                        }
                     }
                 }
+                aristasIteracion.push_back(totalAristas);
+                //Algoritmos
+                aristasAlgoritmo = kruskal(grafo);
+                aristasAlgoritmo.clear();
+                aristasAlgoritmo = prim(grafo);
             }
-            aristasIteracion.push_back(totalAristas);
-            //Algoritmos
-            aristasAlgoritmo = kruskal(grafo);
-            aristasAlgoritmo.clear();
-            aristasAlgoritmo = prim(grafo);
-        }
-        std::cout << "Tiempos de ejecucion de Kruskal\nTiempo\t\t#Aristas\n";
-        double promedioKruskal = 0, promedioPrim = 0;
-        for (int i = 0; i < iteraciones; i++) {
-            std::cout << std::fixed << std::setprecision(5) << tiemposKruskal[i] << "ms\t"<< aristasIteracion[i]<< "\n";
-            promedioKruskal += tiemposKruskal[i];
-        }
-        std::cout << "Tiempos de ejecucion de Prim\n# Tiempo\t#Aristas\n";
-        for (int i = 0; i < iteraciones; i++) {
-            std::cout << tiemposPrim[i] << "ms\t"<< aristasIteracion[i]<< "\n";
-            promedioPrim += tiemposPrim[i];
-        }
-        std::cout << "Promedio Kruskal: "<< promedioKruskal/iteraciones << "ms\n";
-        std::cout << "Promedio Prim: "<< promedioPrim/iteraciones << "ms\n";
+            std::cout << "Tiempos de ejecucion de Kruskal\nTiempo\t\t#Aristas\n";
+            double promedioKruskal = 0, promedioPrim = 0;
+            for (int i = 0; i < iteraciones; i++) {
+                std::cout << std::fixed << std::setprecision(5) << tiemposKruskal[i] << "ms\t"<< aristasIteracion[i]<< "\n";
+                promedioKruskal += tiemposKruskal[i];
+            }
+            std::cout << "Tiempos de ejecucion de Prim\n# Tiempo\t#Aristas\n";
+            for (int i = 0; i < iteraciones; i++) {
+                std::cout << tiemposPrim[i] << "ms\t"<< aristasIteracion[i]<< "\n";
+                promedioPrim += tiemposPrim[i];
+            }
+            std::cout << "Promedio Kruskal: "<< promedioKruskal/iteraciones << "ms\n";
+            std::cout << "Promedio Prim: "<< promedioPrim/iteraciones << "ms\n";
 
-        std::vector<int> numAristasUsadasK;
-        std::vector<int> numAristasUsadasP;
+            std::vector<int> numAristasUsadasK;
+            std::vector<int> numAristasUsadasP;
 
-        std::cout << "\nPromedio por aristas en Kruskal\nAristas\tTiempo\n";
-        for (int i = 0; i < iteraciones; ++i) {
-            numAristasActual = aristasIteracion[i];
+            std::cout << "\nPromedio por aristas en Kruskal\nAristas\tTiempo\n";
+            for (int i = 0; i < iteraciones; ++i) {
+                numAristasActual = aristasIteracion[i];
 
-            if (std::find(numAristasUsadasK.begin(), numAristasUsadasK.end(), numAristasActual) == numAristasUsadasK.end()) {
-                int veces = 0;
-                double sumaTiempos = 0.0;
+                if (std::find(numAristasUsadasK.begin(), numAristasUsadasK.end(), numAristasActual) == numAristasUsadasK.end()) {
+                    int veces = 0;
+                    double sumaTiempos = 0.0;
 
-                for (int j = 0; j < iteraciones; ++j){
-                    if (numAristasActual == aristasIteracion[j]){
-                        sumaTiempos += tiemposKruskal[j];
-                        veces++;
+                    for (int j = 0; j < iteraciones; ++j){
+                        if (numAristasActual == aristasIteracion[j]){
+                            sumaTiempos += tiemposKruskal[j];
+                            veces++;
+                        }
                     }
+
+                    double promedio = sumaTiempos / veces;
+                    std::cout << numAristasActual << "\t" << promedio << " ms\n";
+                    numAristasUsadasK.push_back(numAristasActual);
                 }
-
-                double promedio = sumaTiempos / veces;
-                std::cout << numAristasActual << "\t" << promedio << " ms\n";
-                numAristasUsadasK.push_back(numAristasActual);
             }
-        }
-        numAristasActual = 0;
-        std::cout << "\nPromedio por aristas en Prim\nAristas\tTiempo\n";
-        for (int i = 0; i < iteraciones; ++i) {
-            numAristasActual = aristasIteracion[i];
+            numAristasActual = 0;
+            std::cout << "\nPromedio por aristas en Prim\nAristas\tTiempo\n";
+            for (int i = 0; i < iteraciones; ++i) {
+                numAristasActual = aristasIteracion[i];
 
-            if (std::find(numAristasUsadasP.begin(), numAristasUsadasP.end(), numAristasActual) == numAristasUsadasP.end()) {
-                int veces = 0;
-                double sumaTiempos = 0.0;
+                if (std::find(numAristasUsadasP.begin(), numAristasUsadasP.end(), numAristasActual) == numAristasUsadasP.end()) {
+                    int veces = 0;
+                    double sumaTiempos = 0.0;
 
-                for (int j = 0; j < iteraciones; ++j){
-                    if (numAristasActual == aristasIteracion[j]){
-                        sumaTiempos += tiemposPrim[j];
-                        veces++;
+                    for (int j = 0; j < iteraciones; ++j){
+                        if (numAristasActual == aristasIteracion[j]){
+                            sumaTiempos += tiemposPrim[j];
+                            veces++;
+                        }
                     }
+
+                    double promedio = sumaTiempos / veces;
+                    std::cout << numAristasActual << "\t" << promedio << " ms\n";
+                    numAristasUsadasP.push_back(numAristasActual);
                 }
-
-                double promedio = sumaTiempos / veces;
-                std::cout << numAristasActual << "\t" << promedio << " ms\n";
-                numAristasUsadasP.push_back(numAristasActual);
             }
-        }
+        } else {
+            int iteraciones = 100, N = 2, totalAristas, numAristasActual = 0, rangomin = 3, rangomax = 200;
+            int rango = rangomax - rangomin + 1;
+            std::vector<Arista> aristasAlgoritmo, aristasTotales;
+            std::vector<int> aristasIteracion;
+            visual = !visual;
+            for (N = rangomin; N <= rangomax ; ++N) {
+                grafo.numVertices = N;
+                for (int i = 0; i < iteraciones; i++){
+                    totalAristas = 0;
+                    std::vector<std::vector<int>> matrizAdyacencia = generarMatrizAdyacenciaAleatoria(N, 0, 10);
+                    grafo.matrizAdyacencia = matrizAdyacencia;
+                    //Se halla la cantidad de aristas del grafo generado
+                    for (int j = 0; j < grafo.numVertices; ++j) {
+                        for (int z = j + 1; z < grafo.numVertices; ++z) {
+                            if (grafo.matrizAdyacencia[j][z] != 0) {
+                                totalAristas++;
+                            }
+                        }
+                    }
 
+                    aristasIteracion.push_back(totalAristas);
+                    //Algoritmos
+
+                    aristasAlgoritmo = kruskal(grafo);
+                    aristasAlgoritmo.clear();
+                    aristasAlgoritmo = prim(grafo);
+                }
+            }
+            double promedioKruskal = 0, promedioPrim = 0;
+            for (int i = 0; i < iteraciones*rango; i ++) {
+                promedioKruskal += tiemposKruskal[i];
+                promedioPrim += tiemposPrim[i];
+            }
+            std::cout << std::fixed << std::setprecision(5) << "Promedio Kruskal: "<< promedioKruskal/(iteraciones*rango) << "ms\n";
+            std::cout << "Promedio Prim: "<< promedioPrim/(iteraciones*rango) << "ms\n";
+
+            std::vector<int> numAristasUsadasK;
+            std::vector<int> numAristasUsadasP;
+            //Abrimos archivos
+            std::ofstream kruskal("kruskal.txt");
+            std::ofstream prim("prim.txt");
+
+            std::cout << "\nPromedio por aristas en Kruskal\nAristas\tTiempo\n";
+            for (int i = 0; i < iteraciones * rango; ++i) {
+                numAristasActual = aristasIteracion[i];
+
+                if (std::find(numAristasUsadasK.begin(), numAristasUsadasK.end(), numAristasActual) == numAristasUsadasK.end()) {
+                    int veces = 0;
+                    double sumaTiempos = 0.0;
+
+                    for (int j = 0; j < iteraciones * rango; ++j){
+                        if (numAristasActual == aristasIteracion[j]){
+                            sumaTiempos += tiemposKruskal[j];
+                            veces++;
+                        }
+                    }
+
+                    double promedio = sumaTiempos / veces;
+                    std::cout << std::fixed << std::setprecision(5) << numAristasActual << "\t" << promedio << " ms\n";
+                    kruskal << numAristasActual << "\t" << promedio << "\n";
+                    numAristasUsadasK.push_back(numAristasActual);
+                }
+            }
+            kruskal.close();
+            numAristasActual = 0;
+            std::cout << "\nPromedio por aristas en Prim\nAristas\tTiempo\n";
+            for (int i = 0; i < iteraciones * rango; ++i) {
+                numAristasActual = aristasIteracion[i];
+
+                if (std::find(numAristasUsadasP.begin(), numAristasUsadasP.end(), numAristasActual) == numAristasUsadasP.end()) {
+                    int veces = 0;
+                    double sumaTiempos = 0.0;
+
+                    for (int j = 0; j < iteraciones * rango; ++j){
+                        if (numAristasActual == aristasIteracion[j]){
+                            sumaTiempos += tiemposPrim[j];
+                            veces++;
+                        }
+                    }
+
+                    double promedio = sumaTiempos / veces;
+                    std::cout << numAristasActual << "\t" << promedio << " ms\n";
+                    prim << numAristasActual << "\t" << promedio << "\n";
+                    numAristasUsadasP.push_back(numAristasActual);
+                }
+            }
+            prim.close();
+        }
         return 0;
     }
 
