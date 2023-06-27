@@ -1,5 +1,4 @@
-#Actualizar la ruta de rutakruskal y rutaprim para que funcione al descargar
-#el proyecto
+#Actualizar la ruta de rutakruskal y rutaprim para que funcione al descargar el proyecto
 rutakruskal <- "C:/Users/Alonso/Desktop/Proyecto/cmake-build-debug/kruskal.txt"
 rutaprim <- "C:/Users/Alonso/Desktop/Proyecto/cmake-build-debug/prim.txt"
 datos_kruskal <- read.table(rutakruskal, header = FALSE)
